@@ -53,6 +53,8 @@ jobs:
       # 5️⃣ Generate release notes (squash-and-merge aware)
       - name: Generate release notes
         id: release_notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Get repo URL from package.json
           REPO_URL=$(node -p "require('./package.json').repository.url")
@@ -64,7 +66,7 @@ jobs:
           # Last tag
           LAST_TAG=$(git describe --tags --abbrev=0 HEAD^)
 
-          # Fetch merged PRs since last tag
+          # Fetch merged PRs since last tag using gh
           PRS=$(gh pr list --repo $REPO_URL --state merged --base development --json number,title,author,url --limit 100)
 
           # Build release notes
