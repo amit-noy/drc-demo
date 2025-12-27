@@ -58,17 +58,25 @@ jobs:
         run: |
           # Get repo URL from package.json
           REPO_URL=$(node -p "require('./package.json').repository.url")
-          REPO_URL=${REPO_URL#git@github.com:}
-          REPO_URL=${REPO_URL#https://github.com/}
-          REPO_URL=${REPO_URL%.git}
-          REPO_URL="https://github.com/$REPO_URL"
-
+          
+          # Normalize to GitHub HTTPS
+          if [[ "$REPO_URL" == git://* ]]; then
+            REPO_URL=${REPO_URL#git://}       # remove git://
+            REPO_URL=${REPO_URL%.git}         # remove .git suffix
+            REPO_URL="https://$REPO_URL"
+          else
+            REPO_URL=${REPO_URL#git@github.com:}
+            REPO_URL=${REPO_URL#https://github.com/}
+            REPO_URL=${REPO_URL%.git}
+            REPO_URL="https://github.com/$REPO_URL"
+          fi
+          
           # Last tag
           LAST_TAG=$(git describe --tags --abbrev=0 HEAD^)
-
+          
           # Fetch merged PRs since last tag using gh
           PRS=$(gh pr list --repo $REPO_URL --state merged --base development --json number,title,author,url --limit 100)
-
+          
           # Build release notes
           if [ $(echo "$PRS" | jq 'length') -eq 0 ]; then
             NOTES="## What's Changed\n* No merged PRs since last release"
@@ -85,9 +93,9 @@ jobs:
               NOTES+="\n* $TITLE by @$USER in $URL"
             done
           fi
-
+          
           NOTES+="\n\n**Full Changelog**: $REPO_URL/compare/$LAST_TAG...${{ env.NEW_VERSION }}"
-
+          
           echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
           echo "$NOTES" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
