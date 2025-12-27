@@ -41,43 +41,50 @@ jobs:
           git config user.email "github-actions@github.com"
 
           if [ -n "${{ github.event.inputs.version }}" ]; then
-            # Manual trigger: use provided version
             NEW_VERSION=${{ github.event.inputs.version }}
             npm version $NEW_VERSION --no-git-tag-version -m "chore(release): bump version to %s"
           else
-            # Auto patch bump if no input provided
             NEW_VERSION=$(npm version patch -m "chore(release): bump version to %s")
           fi
 
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           git push origin development --follow-tags
 
-      # 5️⃣ Generate release notes dynamically from merged PRs
+      # 5️⃣ Generate release notes (squash-and-merge aware)
       - name: Generate release notes
         id: release_notes
         run: |
-          # Get repo from package.json
+          # Get repo URL from package.json
           REPO_URL=$(node -p "require('./package.json').repository.url")
           REPO_URL=${REPO_URL#git@github.com:}
           REPO_URL=${REPO_URL#https://github.com/}
           REPO_URL=${REPO_URL%.git}
+          REPO_URL="https://github.com/$REPO_URL"
 
-          # Get last tag
+          # Last tag
           LAST_TAG=$(git describe --tags --abbrev=0 HEAD^)
 
-          # Count merged PRs since last tag
-          PR_COUNT=$(gh pr list --repo $REPO_URL --state merged --base development --search "merged:>$LAST_TAG" --json number | jq '. | length')
+          # Fetch merged PRs since last tag
+          PRS=$(gh pr list --repo $REPO_URL --state merged --base development --json number,title,author,url --limit 100)
 
-          if [ "$PR_COUNT" -le 1 ]; then
-            NOTES="#### Dashboard\n"
-            NOTES+=$(git log $LAST_TAG..HEAD --merges --pretty=format:"- [%h] %s (#%d)" | sed 's/.*(#\([0-9]*\)).*/- [FIX] \1/')
-            NOTES+="\n\n**Full Changelog**: https://github.com/$REPO_URL/compare/$LAST_TAG...${{ env.NEW_VERSION }}"
+          # Build release notes
+          if [ $(echo "$PRS" | jq 'length') -eq 0 ]; then
+            NOTES="## What's Changed\n* No merged PRs since last release"
           else
-            NOTES="## What's Changed\n"
-            NOTES+=$(gh pr list --repo $REPO_URL --state merged --base development --search "merged:>$LAST_TAG" --json number,title,author,url | \
-              jq -r '.[] | "* [" + .title + "] by @" + .author.login + " in " + .url')
-            NOTES+="\n\n**Full Changelog**: https://github.com/$REPO_URL/compare/$LAST_TAG...${{ env.NEW_VERSION }}"
+            NOTES="## What's Changed"
+            for row in $(echo "$PRS" | jq -r '.[] | @base64'); do
+              _jq() {
+                echo "$row" | base64 --decode | jq -r "$1"
+              }
+              TITLE=$(_jq '.title')
+              NUMBER=$(_jq '.number')
+              USER=$(_jq '.author.login')
+              URL=$(_jq '.url')
+              NOTES+="\n* $TITLE by @$USER in $URL"
+            done
           fi
+
+          NOTES+="\n\n**Full Changelog**: $REPO_URL/compare/$LAST_TAG...${{ env.NEW_VERSION }}"
 
           echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
           echo "$NOTES" >> $GITHUB_ENV
@@ -99,7 +106,7 @@ jobs:
       - name: Build package
         run: npm run build
 
-#     # 8️⃣ Publish to npm
+#      # 8️⃣ Publish to npm
 #      - name: Publish to npm
 #        run: npm publish --access public
 #        env:
