@@ -1,9 +1,6 @@
 name: Auto Publish to npm
 
 on:
-  push:
-    branches:
-      - development
   workflow_dispatch:
     inputs:
       version:
@@ -16,24 +13,27 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write
+      contents: write  # allows commits, tags, and releases
 
     steps:
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 #          registry-url: 'https://registry.npmjs.org'
 
+      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: npm ci
 
-      # 1️⃣ Determine release version
+      # 4️⃣ Determine release version
       - name: Determine release version
         id: version
         run: |
@@ -45,25 +45,45 @@ jobs:
             NEW_VERSION=${{ github.event.inputs.version }}
             npm version $NEW_VERSION --no-git-tag-version -m "chore(release): bump version to %s"
           else
-            # Automated trigger: bump patch version
+            # Auto patch bump if no input provided
             NEW_VERSION=$(npm version patch -m "chore(release): bump version to %s")
           fi
 
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           git push origin development --follow-tags
 
-      # 2️⃣ Generate release notes from merged PRs
-      - name: Generate release notes from merged PRs
+      # 5️⃣ Generate release notes dynamically from merged PRs
+      - name: Generate release notes
         id: release_notes
         run: |
+          # Get repo from package.json
+          REPO_URL=$(node -p "require('./package.json').repository.url")
+          REPO_URL=${REPO_URL#git@github.com:}
+          REPO_URL=${REPO_URL#https://github.com/}
+          REPO_URL=${REPO_URL%.git}
+
+          # Get last tag
           LAST_TAG=$(git describe --tags --abbrev=0 HEAD^)
-          NOTES=$(git log $LAST_TAG..HEAD --merges --pretty=format:"- %s" | sed 's/Merge pull request #/PR #/')
-          NOTES="### Merged PRs for this release\n$NOTES"
+
+          # Count merged PRs since last tag
+          PR_COUNT=$(gh pr list --repo $REPO_URL --state merged --base development --search "merged:>$LAST_TAG" --json number | jq '. | length')
+
+          if [ "$PR_COUNT" -le 1 ]; then
+            NOTES="#### Dashboard\n"
+            NOTES+=$(git log $LAST_TAG..HEAD --merges --pretty=format:"- [%h] %s (#%d)" | sed 's/.*(#\([0-9]*\)).*/- [FIX] \1/')
+            NOTES+="\n\n**Full Changelog**: https://github.com/$REPO_URL/compare/$LAST_TAG...${{ env.NEW_VERSION }}"
+          else
+            NOTES="## What's Changed\n"
+            NOTES+=$(gh pr list --repo $REPO_URL --state merged --base development --search "merged:>$LAST_TAG" --json number,title,author,url | \
+              jq -r '.[] | "* [" + .title + "] by @" + .author.login + " in " + .url')
+            NOTES+="\n\n**Full Changelog**: https://github.com/$REPO_URL/compare/$LAST_TAG...${{ env.NEW_VERSION }}"
+          fi
+
           echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
           echo "$NOTES" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      # 3️⃣ Create GitHub Release
+      # 6️⃣ Create GitHub Release
       - name: Create GitHub Release
         uses: actions/create-release@v1
         with:
@@ -75,11 +95,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 4️⃣ Build the package
+      # 7️⃣ Build the package
       - name: Build package
         run: npm run build
 
-#      # 5️⃣ Publish to npm
+#     # 8️⃣ Publish to npm
 #      - name: Publish to npm
 #        run: npm publish --access public
 #        env:
