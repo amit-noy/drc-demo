@@ -1,0 +1,63 @@
+name: Auto Publish to npm
+
+on:
+  push:
+    branches:
+      - development
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      # 1️⃣ Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2️⃣ Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+#          registry-url: 'https://registry.npmjs.org'
+
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # 4️⃣ Bump patch version automatically
+      - name: Bump version (patch)
+        id: bump
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          # automatically bump patch version
+          NEW_VERSION=$(npm version patch)
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          git push origin development --follow-tags
+
+      # 5️⃣ Build the package
+      - name: Build package
+        run: npm run build
+
+#      # 6️⃣ Publish to npm
+#      - name: Publish to npm
+#        run: npm publish --access public
+#        env:
+#          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # 7️⃣ Create GitHub Release
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ env.NEW_VERSION }}
+          release_name: ${{ env.NEW_VERSION }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
