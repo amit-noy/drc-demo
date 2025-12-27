@@ -77,24 +77,24 @@ jobs:
             REPO_URL=${REPO_URL%.git}
             REPO_URL="https://github.com/$REPO_URL"
           fi
-
+          
           # Get last tag
           LAST_TAG=$(git describe --tags --abbrev=0 HEAD^)
-
+          
           # Fetch merged PRs since last tag
           PRS=$(gh pr list --repo $REPO_URL \
                 --state merged \
                 --base development \
                 --json number,title,author,url,mergedAt \
                 --limit 100)
-
+          
           # Filter PRs merged after last tag commit
           LAST_COMMIT=$(git rev-list -n 1 $LAST_TAG)
           PRS=$(echo "$PRS" | jq --arg LAST "$LAST_COMMIT" '[.[] | select(.mergedAt > $LAST)]')
-
+          
           # Build release notes
           NOTES="## What's Changed\n"
-
+          
           if [ $(echo "$PRS" | jq 'length') -eq 0 ]; then
             NOTES+="* No merged PRs since last release\n"
           else
@@ -109,11 +109,13 @@ jobs:
               NOTES+="* $TITLE by @$USER in $URL\n"
             done
           fi
-
+          
           NOTES+="\n**Full Changelog**: $REPO_URL/compare/$LAST_TAG...${{ env.NEW_VERSION }}\n"
-
-          # Export release notes with proper newlines
-          printf "%b" "$NOTES" >> $GITHUB_ENV
+          
+          # Export release notes safely to GITHUB_ENV
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
+          printf "%s" "$NOTES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       # 6️⃣ Create GitHub Release
       - name: Create GitHub Release
