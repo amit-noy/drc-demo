@@ -1,4 +1,4 @@
-name: Auto Publish to npm
+name: Manual NPM Release
 
 on:
   workflow_dispatch:
@@ -9,11 +9,11 @@ on:
         type: string
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write  # allows commits, tags, and releases
+      contents: write
 
     steps:
       # 1️⃣ Checkout repository
@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 4️⃣ Determine release version
+      # 4️⃣ Determine and bump version
       - name: Determine release version
         id: version
         run: |
@@ -48,21 +48,23 @@ jobs:
           fi
 
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-          git push origin development --follow-tags
 
-      # 5️⃣ Generate release notes (squash-and-merge aware)
+          # Push the updated package.json to development
+          git add package.json package-lock.json
+          git commit -m "chore(release): bump version to $NEW_VERSION"
+          git push origin development
+
+      # 5️⃣ Generate release notes from merged PRs
       - name: Generate release notes
         id: release_notes
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          # Get repo URL from package.json
+          # Normalize repo URL from package.json
           REPO_URL=$(node -p "require('./package.json').repository.url")
-          
-          # Normalize to GitHub HTTPS
           if [[ "$REPO_URL" == git://* ]]; then
-            REPO_URL=${REPO_URL#git://}       # remove git://
-            REPO_URL=${REPO_URL%.git}         # remove .git suffix
+            REPO_URL=${REPO_URL#git://}
+            REPO_URL=${REPO_URL%.git}
             REPO_URL="https://$REPO_URL"
           else
             REPO_URL=${REPO_URL#git@github.com:}
@@ -70,13 +72,21 @@ jobs:
             REPO_URL=${REPO_URL%.git}
             REPO_URL="https://github.com/$REPO_URL"
           fi
-          
-          # Last tag
+
+          # Get last tag
           LAST_TAG=$(git describe --tags --abbrev=0 HEAD^)
-          
-          # Fetch merged PRs since last tag using gh
-          PRS=$(gh pr list --repo $REPO_URL --state merged --base development --json number,title,author,url --limit 100)
-          
+
+          # Fetch merged PRs since last tag
+          PRS=$(gh pr list --repo $REPO_URL \
+                --state merged \
+                --base development \
+                --json number,title,author,url,mergedAt \
+                --limit 100)
+
+          # Filter PRs merged after last tag
+          LAST_COMMIT=$(git rev-list -n 1 $LAST_TAG)
+          PRS=$(echo "$PRS" | jq --arg LAST "$LAST_COMMIT" '[.[] | select(.mergedAt > $LAST)]')
+
           # Build release notes
           if [ $(echo "$PRS" | jq 'length') -eq 0 ]; then
             NOTES="## What's Changed\n* No merged PRs since last release"
@@ -93,9 +103,9 @@ jobs:
               NOTES+="\n* $TITLE by @$USER in $URL"
             done
           fi
-          
+
           NOTES+="\n\n**Full Changelog**: $REPO_URL/compare/$LAST_TAG...${{ env.NEW_VERSION }}"
-          
+
           echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
           echo "$NOTES" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
