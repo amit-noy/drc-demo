@@ -39,20 +39,26 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-
+          
           if [ -n "${{ github.event.inputs.version }}" ]; then
             NEW_VERSION=${{ github.event.inputs.version }}
             npm version $NEW_VERSION --no-git-tag-version -m "chore(release): bump version to %s"
           else
             NEW_VERSION=$(npm version patch -m "chore(release): bump version to %s")
           fi
-
+          
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          
+          # Only commit and push if package.json/package-lock.json changed
+          if ! git diff --quiet package.json package-lock.json; then
+            git add package.json package-lock.json
+            git commit -m "chore(release): bump version to $NEW_VERSION"
+            git pull origin development --rebase
+            git push origin development
+          else
+            echo "No version changes to commit, skipping push."
+          fi
 
-          # Push the updated package.json to development
-          git add package.json package-lock.json
-          git commit -m "chore(release): bump version to $NEW_VERSION"
-          git push origin development
 
       # 5️⃣ Generate release notes from merged PRs
       - name: Generate release notes
