@@ -78,8 +78,14 @@ jobs:
             REPO_URL="https://github.com/$REPO_URL"
           fi
           
-          # Get last tag
-          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^)
+          # Get last tag (or empty if none)
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous tags found. Using all commits."
+            LAST_COMMIT=""
+          else
+            LAST_COMMIT=$(git rev-list -n 1 $LAST_TAG)
+          fi
           
           # Fetch merged PRs since last tag
           PRS=$(gh pr list --repo $REPO_URL \
@@ -88,9 +94,10 @@ jobs:
                 --json number,title,author,url,mergedAt \
                 --limit 100)
           
-          # Filter PRs merged after last tag commit
-          LAST_COMMIT=$(git rev-list -n 1 $LAST_TAG)
-          PRS=$(echo "$PRS" | jq --arg LAST "$LAST_COMMIT" '[.[] | select(.mergedAt > $LAST)]')
+          # Filter PRs merged after last tag commit (if any)
+          if [ -n "$LAST_COMMIT" ]; then
+            PRS=$(echo "$PRS" | jq --arg LAST "$LAST_COMMIT" '[.[] | select(.mergedAt > $LAST)]')
+          fi
           
           # Build release notes
           NOTES="## What's Changed\n"
