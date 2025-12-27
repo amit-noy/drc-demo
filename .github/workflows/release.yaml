@@ -33,22 +33,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 4️⃣ Determine and bump version
+      # 4️⃣ Determine and bump version safely
       - name: Determine release version
         id: version
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          
+
           if [ -n "${{ github.event.inputs.version }}" ]; then
             NEW_VERSION=${{ github.event.inputs.version }}
             npm version $NEW_VERSION --no-git-tag-version -m "chore(release): bump version to %s"
           else
             NEW_VERSION=$(npm version patch -m "chore(release): bump version to %s")
           fi
-          
+
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-          
+
           # Only commit and push if package.json/package-lock.json changed
           if ! git diff --quiet package.json package-lock.json; then
             git add package.json package-lock.json
@@ -58,7 +58,6 @@ jobs:
           else
             echo "No version changes to commit, skipping push."
           fi
-
 
       # 5️⃣ Generate release notes from merged PRs
       - name: Generate release notes
@@ -89,15 +88,16 @@ jobs:
                 --json number,title,author,url,mergedAt \
                 --limit 100)
 
-          # Filter PRs merged after last tag
+          # Filter PRs merged after last tag commit
           LAST_COMMIT=$(git rev-list -n 1 $LAST_TAG)
           PRS=$(echo "$PRS" | jq --arg LAST "$LAST_COMMIT" '[.[] | select(.mergedAt > $LAST)]')
 
           # Build release notes
+          NOTES="## What's Changed\n"
+
           if [ $(echo "$PRS" | jq 'length') -eq 0 ]; then
-            NOTES="## What's Changed\n* No merged PRs since last release"
+            NOTES+="* No merged PRs since last release\n"
           else
-            NOTES="## What's Changed"
             for row in $(echo "$PRS" | jq -r '.[] | @base64'); do
               _jq() {
                 echo "$row" | base64 --decode | jq -r "$1"
@@ -106,15 +106,14 @@ jobs:
               NUMBER=$(_jq '.number')
               USER=$(_jq '.author.login')
               URL=$(_jq '.url')
-              NOTES+="\n* $TITLE by @$USER in $URL"
+              NOTES+="* $TITLE by @$USER in $URL\n"
             done
           fi
 
-          NOTES+="\n\n**Full Changelog**: $REPO_URL/compare/$LAST_TAG...${{ env.NEW_VERSION }}"
+          NOTES+="\n**Full Changelog**: $REPO_URL/compare/$LAST_TAG...${{ env.NEW_VERSION }}\n"
 
-          echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
-          echo "$NOTES" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          # Export release notes with proper newlines
+          printf "%b" "$NOTES" >> $GITHUB_ENV
 
       # 6️⃣ Create GitHub Release
       - name: Create GitHub Release
