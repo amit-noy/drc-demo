@@ -1,7 +1,7 @@
 {
   "name": "@amitgini/drc-demo",
   "private": false,
-  "version": "0.1.14",
+  "version": "0.1.15",
   "repository": {
     "url": "git://github.com/amit-noy/drc-demo.git"
   },
@@ -9,6 +9,9 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/drc-demo.umd.js",
   "module": "./dist/drc-demo.es.js",
   "types": "./dist/index.d.ts",
