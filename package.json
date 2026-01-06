@@ -1,7 +1,7 @@
 {
   "name": "@amit-noy/drc-demo",
   "private": false,
-  "version": "0.1.12",
+  "version": "0.1.13",
   "repository": {
     "url": "git://github.com/amit-noy/drc-demo.git"
   },
