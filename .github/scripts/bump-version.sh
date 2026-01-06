@@ -12,13 +12,16 @@ git config user.email "github-actions@github.com"
 CURRENT_VERSION=$(node -p "require('./package.json').version")
 
 if [ -n "$INPUT_VERSION" ]; then
-  NEW_VERSION=$INPUT_VERSION
+  RAW_VERSION=$INPUT_VERSION
 else
   # Increment patch version manually
   IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
   PATCH=$((PATCH + 1))
-  NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+  RAW_VERSION="$MAJOR.$MINOR.$PATCH"
 fi
+
+# Add 'v' prefix
+NEW_VERSION="v$RAW_VERSION"
 
 echo "Current version: $CURRENT_VERSION"
 echo "New version: $NEW_VERSION"
@@ -26,7 +29,8 @@ echo "New version: $NEW_VERSION"
 echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
 # Update package.json and package-lock.json
-npm version "$NEW_VERSION" --no-git-tag-version
+# Remove the 'v' before passing to npm version because npm doesn't like the 'v' in package.json
+npm version "$RAW_VERSION" --no-git-tag-version
 
 # Commit and push
 git add package.json package-lock.json
