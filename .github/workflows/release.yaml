@@ -39,13 +39,6 @@ jobs:
           BRANCH: development
         run: bash .github/scripts/bump-version.sh
 
-      #      - name: Generate release notes
-      #        id: release_notes
-      #        env:
-      #          GH_TOKEN: ${{ secrets.GH_PAT }}
-      #          NEW_VERSION: ${{ env.NEW_VERSION }}
-      #        run: bash .github/scripts/generate-release-notes.sh
-
       - name: Create GitHub Release with Generated Notes
         uses: softprops/action-gh-release@v1
         with:

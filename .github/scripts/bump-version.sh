@@ -8,15 +8,27 @@ set -e
 git config user.name "github-actions"
 git config user.email "github-actions@github.com"
 
+# Get current version from package.json
+CURRENT_VERSION=$(node -p "require('./package.json').version")
+
 if [ -n "$INPUT_VERSION" ]; then
   NEW_VERSION=$INPUT_VERSION
 else
-  NEW_VERSION=$(npm version patch --no-git-tag-version)
+  # Increment patch version manually
+  IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+  PATCH=$((PATCH + 1))
+  NEW_VERSION="$MAJOR.$MINOR.$PATCH"
 fi
+
+echo "Current version: $CURRENT_VERSION"
+echo "New version: $NEW_VERSION"
 
 echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
-# Commit and push updated package.json/package-lock.json
+# Update package.json and package-lock.json
+npm version "$NEW_VERSION" --no-git-tag-version
+
+# Commit and push
 git add package.json package-lock.json
 git commit -m "chore(release): bump version to $NEW_VERSION" || echo "No changes to commit"
 git pull origin "$BRANCH" --rebase
