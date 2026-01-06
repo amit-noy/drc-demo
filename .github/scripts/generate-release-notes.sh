@@ -52,9 +52,9 @@ else
     TITLE=$(_jq '.title')
     NUMBER=$(_jq '.number')
     USER=$(_jq '.author.login')
-    URL=$(_jq '.url')
-    NOTES+="* $TITLE by @$USER in $URL
-"
+    # Replace URL with #(PR number)
+    NOTES+="* $TITLE by @$USER #$NUMBER
+  "
   done
 fi
 
