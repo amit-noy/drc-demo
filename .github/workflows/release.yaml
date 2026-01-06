@@ -28,7 +28,6 @@ jobs:
           cache: 'npm'
           cache-dependency-path: '**/package-lock.json'
           registry-url: 'https://registry.npmjs.org/'
-          scope: '@amitgini'
 
       - name: Install dependencies
         run: npm ci
@@ -40,12 +39,12 @@ jobs:
           BRANCH: development
         run: bash .github/scripts/bump-version.sh
 
-#      - name: Generate release notes
-#        id: release_notes
-#        env:
-#          GH_TOKEN: ${{ secrets.GH_PAT }}
-#          NEW_VERSION: ${{ env.NEW_VERSION }}
-#        run: bash .github/scripts/generate-release-notes.sh
+      #      - name: Generate release notes
+      #        id: release_notes
+      #        env:
+      #          GH_TOKEN: ${{ secrets.GH_PAT }}
+      #          NEW_VERSION: ${{ env.NEW_VERSION }}
+      #        run: bash .github/scripts/generate-release-notes.sh
 
       - name: Create GitHub Release with Generated Notes
         uses: softprops/action-gh-release@v1
@@ -58,11 +57,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-
       - name: Build package
         run: npm run build
 
       - name: Publish to npm
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        uses: JS-DevTools/npm-publish@v4
+        with:
+          token: ${{ secrets.NPM_TOKEN }}
+          access: public
