@@ -2,7 +2,7 @@
 set -e
 
 # Required env:
-# INPUT_VERSION: optional (patch | minor | major | x.y.z)
+# INPUT_VERSION: (patch | minor | major)
 # INPUT_TAG: optional custom tag (e.g., test-tag)
 # BRANCH: branch to push changes (e.g., development)
 
@@ -12,27 +12,38 @@ git config user.email "github-actions[bot]@users.noreply.github.com"
 CURRENT_VERSION=$(node -p "require('./package.json').version")
 echo "Current version: $CURRENT_VERSION"
 
+# Strip branch suffix if present (e.g. 0.3.2-1.10.x → 0.3.2)
+BASE_VERSION="${CURRENT_VERSION%%-*}"
+
+IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+
 if [ -n "$INPUT_TAG" ]; then
-  # Custom tag provided → don't bump version
-  NEW_RAW_VERSION="$CURRENT_VERSION"
+  # Custom tag → do NOT bump version
+  NEW_RAW_VERSION="$BASE_VERSION"
   NEW_VERSION="$NEW_RAW_VERSION-$INPUT_TAG"
   echo "Custom tag provided, version not bumped: $NEW_VERSION"
 else
-  # Bump version according to input (patch/minor/major/custom)
+  # Manual semver bump (safe with suffixes)
   case "$INPUT_VERSION" in
-    major|minor|patch)
-      npm version "$INPUT_VERSION" --no-git-tag-version
+    patch)
+      PATCH=$((PATCH + 1))
       ;;
-    "")
-      npm version patch --no-git-tag-version
+    minor)
+      MINOR=$((MINOR + 1))
+      PATCH=0
+      ;;
+    major)
+      MAJOR=$((MAJOR + 1))
+      MINOR=0
+      PATCH=0
       ;;
     *)
-      npm version "$INPUT_VERSION" --no-git-tag-version
+      echo "Invalid INPUT_VERSION: $INPUT_VERSION"
+      exit 1
       ;;
   esac
 
-  # Get bumped numeric version
-  NEW_RAW_VERSION=$(node -p "require('./package.json').version")
+  NEW_RAW_VERSION="$MAJOR.$MINOR.$PATCH"
   echo "Bumped numeric version: $NEW_RAW_VERSION"
 
   # Add branch suffix if not development
@@ -43,17 +54,17 @@ else
     NEW_VERSION="$NEW_RAW_VERSION-$SAFE_BRANCH"
   fi
 
-  # Update package.json with final version
+  # Update package.json
   jq --arg ver "$NEW_VERSION" '.version = $ver' package.json > package.tmp.json && mv package.tmp.json package.json
 
-  # Commit changes
+  # Commit and push
   git add package.json package-lock.json
   git commit -m "chore(release): bump version to $NEW_VERSION" || echo "No changes to commit"
   git pull origin "$BRANCH" --rebase
   git push origin "$BRANCH"
 fi
 
-# Determine GitHub Release tag (v-prefixed)
+# Determine GitHub Release tag
 if [ -n "$INPUT_TAG" ]; then
   RELEASE_TAG="$NEW_RAW_VERSION-$INPUT_TAG"
 else
