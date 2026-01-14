@@ -12,17 +12,6 @@ on:
           - minor
           - major
 
-      allow_release_notes:
-        description: 'Release note'
-        required: true
-        default: true
-        type: boolean
-
-      tag:
-        description: 'Optional: specify a custom NPM tag for this release'
-        required: false
-        type: string
-
 
 jobs:
   release:
@@ -63,10 +52,10 @@ jobs:
         with:
           token: ${{ secrets.NPM_TOKEN }}
           access: public
-          tag: ${{ github.event.inputs.tag != '' && github.event.inputs.tag || (github.ref_name == 'development' && 'latest' || format('mlrun-{0}', github.ref_name)) }}
+          tag: ${{ github.ref_name == 'development' && 'latest' || format('mlrun-{0}', github.ref_name) }}
 
       - name: Create GitHub Release with Generated Notes
-        if: ${{ steps.publish.outcome == 'success' && github.event.inputs.allow_release_notes == 'true' }}
+        if: ${{ steps.publish.outcome == 'success' }}
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.RELEASE_TAG }}
