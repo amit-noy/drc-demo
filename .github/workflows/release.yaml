@@ -74,8 +74,8 @@ jobs:
         if: ${{ steps.publish.outcome == 'success' && github.event.inputs.allow_release_notes == 'true' }}
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.NEW_VERSION }}
-          name: ${{ env.NEW_VERSION }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
           draft: false
           prerelease: false
           generate_release_notes: true
