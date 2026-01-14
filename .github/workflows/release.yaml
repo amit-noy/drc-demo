@@ -4,7 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Type of semantic version bump'
+        description: >
+          Type of semantic version bump to apply.
+          - patch: bug fixes x.x.1
+          - minor: new features x.1.X
+          - major: breaking changes 1.x.x
         required: true
         type: choice
         options:
@@ -12,10 +16,21 @@ on:
           - minor
           - major
 
+      allow_release_notes:
+        description: 'Check to allow this version bump to trigger a release note'
+        required: true
+        default: true
+        type: boolean
+
+      tag:
+        description: 'Optional: specify a custom NPM tag for this release'
+        required: false
+        type: string
+
+
 jobs:
   release:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/development'
 
     permissions:
       contents: write
@@ -40,10 +55,22 @@ jobs:
       - name: Bump package version
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
-          BRANCH: development
+          BRANCH: ${{ github.ref_name }}
         run: bash .github/scripts/bump-version.sh
 
+      - name: Build package
+        run: npm run build
+
+      - name: Publish to npm
+        if: ${{ github.ref_name == 'development' || github.event.inputs.tag != '' }}
+        uses: JS-DevTools/npm-publish@v4
+        with:
+          token: ${{ secrets.NPM_TOKEN }}
+          access: public
+          tag: ${{ github.ref_name == 'development' && 'latest' || github.event.inputs.tag }}
+
       - name: Create GitHub Release with Generated Notes
+        if: ${{ steps.publish.outcome == 'success' && github.event.inputs.allow_release_notes == 'true' }}
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.NEW_VERSION }}
@@ -54,11 +81,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build package
-        run: npm run build
-
-      - name: Publish to npm
-        uses: JS-DevTools/npm-publish@v4
-        with:
-          token: ${{ secrets.NPM_TOKEN }}
-          access: public
