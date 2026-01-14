@@ -62,6 +62,7 @@ jobs:
         run: npm run build
 
       - name: Publish to npm
+        id: publish
         if: ${{ github.ref_name == 'development' || github.event.inputs.tag != '' }}
         uses: JS-DevTools/npm-publish@v4
         with:
