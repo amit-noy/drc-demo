@@ -4,11 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: >
-          Type of semantic version bump to apply.
-          - patch: bug fixes x.x.1
-          - minor: new features x.1.X
-          - major: breaking changes 1.x.x
+        description: Type of semantic version bump to apply.
         required: true
         type: choice
         options:
@@ -17,7 +13,7 @@ on:
           - major
 
       allow_release_notes:
-        description: 'Check to allow this version bump to trigger a release note'
+        description: 'Release note'
         required: true
         default: true
         type: boolean
