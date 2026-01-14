@@ -16,7 +16,7 @@ export const Button: FC<ButtonProps> = ({
                 borderRadius: 6,
                 border: '1px solid #ccc',
                 cursor: 'pointer',
-                backgroundColor: variant === 'primary' ? '#0015ff' : '#fff'
+                backgroundColor: variant === 'primary' ? '#2aff11' : '#fff'
             }}
         >
             {children}
