@@ -24,27 +24,27 @@ case "$INPUT_VERSION" in
     ;;
 esac
 
-# Get bumped version
+# Get bumped version (numeric)
 NEW_RAW_VERSION=$(node -p "require('./package.json').version")
+echo "Bumped numeric version: $NEW_RAW_VERSION"
 
-# Determine suffix: only add for non-development branches
+# Update package.json with numeric version only
+jq --arg ver "$NEW_RAW_VERSION" '.version = $ver' package.json > package.tmp.json && mv package.tmp.json package.json
+
+# Determine GitHub Release tag (v-prefixed)
 if [ "$BRANCH" = "development" ]; then
-  NEW_VERSION="$NEW_RAW_VERSION"
+  RELEASE_TAG="v$NEW_RAW_VERSION"
 else
-  # Replace slashes in branch names with dashes (e.g., poc/something → poc-something)
   SAFE_BRANCH=$(echo "$BRANCH" | tr '/' '-')
-  NEW_VERSION="$NEW_RAW_VERSION-$SAFE_BRANCH"
+  RELEASE_TAG="v$NEW_RAW_VERSION-$SAFE_BRANCH"
 fi
 
-echo "New version: $NEW_VERSION"
-echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
+echo "GitHub Release tag: $RELEASE_TAG"
+echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
 
-# Update package.json with the final version (including branch suffix)
-# This ensures the version in package.json matches NEW_VERSION
-jq --arg ver "$NEW_VERSION" '.version = $ver' package.json > package.tmp.json && mv package.tmp.json package.json
-
+# Commit updated package files
 git add package.json package-lock.json
-git commit -m "chore(release): bump version to $NEW_VERSION" || echo "No changes to commit"
+git commit -m "chore(release): bump version to $NEW_RAW_VERSION" || echo "No changes to commit"
 
 git pull origin "$BRANCH" --rebase
 git push origin "$BRANCH"

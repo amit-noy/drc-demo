@@ -59,19 +59,18 @@ jobs:
 
       - name: Publish to npm
         id: publish
-        if: ${{ github.ref_name == 'development' || github.event.inputs.tag != '' }}
         uses: JS-DevTools/npm-publish@v4
         with:
           token: ${{ secrets.NPM_TOKEN }}
           access: public
-          tag: ${{ github.ref_name == 'development' && 'latest' || github.event.inputs.tag }}
+          tag: ${{ github.event.inputs.tag != '' && github.event.inputs.tag || (github.ref_name == 'development' && 'latest' || format('mlrun-{0}', github.ref_name)) }}
 
       - name: Create GitHub Release with Generated Notes
         if: ${{ steps.publish.outcome == 'success' && github.event.inputs.allow_release_notes == 'true' }}
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.NEW_VERSION }}
-          name: ${{ env.NEW_VERSION }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
           draft: false
           prerelease: false
           generate_release_notes: true
