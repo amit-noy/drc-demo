@@ -1,59 +1,55 @@
 #!/bin/bash
 set -e
 
-# ============================
-# Bump package version script
-# ============================
+# ========================================
+# Bump version script with branch suffix
+# ========================================
 # This script:
-# 1. Reads the current version from package.json
-# 2. Extracts numeric version only (x.y.z), ignoring any branch suffix
-# 3. Bumps the version according to INPUT_VERSION (patch, minor, major)
-# 4. Resets PATCH/MINOR when appropriate
-# 5. Updates package.json safely
-# 6. Exports NEW_VERSION for use in the release script
-# 7. Logs all steps for clarity
+# Reads current version from package.json
+# Extracts numeric version only
+# Bumps patch, minor, or major
+# Adds branch suffix if not development
+# Updates package.json
+# Exports NEW_VERSION and FINAL_VERSION for workflow
 
 # Required env:
 # INPUT_VERSION: patch | minor | major
+# BRANCH: branch name (e.g., development)
+
+git config user.name "github-actions[bot]"
+git config user.email "github-actions[bot]@users.noreply.github.com"
 
 echo "---------------------------------------------------"
-echo "Bumping package version (type: $INPUT_VERSION)"
-echo "---------------------------------------------------"
-
-# -----------------------
-# Read current version
-# -----------------------
+echo "[1] Current branch: $BRANCH"
 CURRENT_VERSION=$(node -p "require('./package.json').version")
-echo "[1] Current package.json version: $CURRENT_VERSION"
+echo "[2] Current version in package.json: $CURRENT_VERSION"
 
 # -----------------------
-# Extract numeric part only
+# Extract numeric version only
 # -----------------------
-# Example: "1.2.3-feature" → "1.2.3"
-NUMERIC_VERSION=$(echo "$CURRENT_VERSION" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+')
-echo "[2] Base numeric version extracted: $NUMERIC_VERSION"
+BASE_VERSION=$(echo "$CURRENT_VERSION" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+')
+echo "[3] Base numeric version: $BASE_VERSION"
 
-IFS='.' read -r MAJOR MINOR PATCH <<< "$NUMERIC_VERSION"
-echo "[2a] Parsed: MAJOR=$MAJOR, MINOR=$MINOR, PATCH=$PATCH"
+IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
 
 # -----------------------
-# Semantic version bump
+# Bump numeric version
 # -----------------------
 case "$INPUT_VERSION" in
   patch)
     PATCH=$((PATCH + 1))
-    echo "[3] Bumping PATCH → $PATCH"
+    echo "[4] Bumping PATCH → $PATCH"
     ;;
   minor)
     MINOR=$((MINOR + 1))
     PATCH=0
-    echo "[3] Bumping MINOR → $MINOR and resetting PATCH → $PATCH"
+    echo "[4] Bumping MINOR → $MINOR and resetting PATCH → $PATCH"
     ;;
   major)
     MAJOR=$((MAJOR + 1))
     MINOR=0
     PATCH=0
-    echo "[3] Bumping MAJOR → $MAJOR and resetting MINOR/PATCH → $MINOR/$PATCH"
+    echo "[4] Bumping MAJOR → $MAJOR and resetting MINOR/PATCH → $MINOR/$PATCH"
     ;;
   *)
     echo "[!] Invalid INPUT_VERSION: $INPUT_VERSION"
@@ -62,23 +58,30 @@ case "$INPUT_VERSION" in
 esac
 
 NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-echo "[4] New numeric version: $NEW_VERSION"
+echo "[5] Numeric version after bump: $NEW_VERSION"
+
+# -----------------------
+# Add branch suffix if not development
+# -----------------------
+if [ "$BRANCH" = "development" ]; then
+  FINAL_VERSION="$NEW_VERSION"
+else
+  SAFE_BRANCH=$(echo "$BRANCH" | tr '/' '-')
+  FINAL_VERSION="$NEW_VERSION-$SAFE_BRANCH"
+fi
+echo "[6] Final version to write to package.json: $FINAL_VERSION"
 
 # -----------------------
 # Update package.json
 # -----------------------
-echo "[5] Updating package.json with new version $NEW_VERSION"
-jq --arg ver "$NEW_VERSION" '.version = $ver' package.json > package.tmp.json && mv package.tmp.json package.json
+jq --arg ver "$FINAL_VERSION" '.version = $ver' package.json > package.tmp.json && mv package.tmp.json package.json
+echo "[7] package.json updated with version $FINAL_VERSION"
 
 # -----------------------
-# Export NEW_VERSION for workflow
+# Export versions for workflow
 # -----------------------
-echo "[6] Exporting NEW_VERSION for workflow / release script"
 echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
+echo "FINAL_VERSION=$FINAL_VERSION" >> "$GITHUB_ENV"
 
-# -----------------------
-# Final log
-# -----------------------
-echo "[7] Version bump complete ✅"
-echo "[7a] package.json now has version: $NEW_VERSION"
+echo "[8] Version bump complete ✅"
 echo "---------------------------------------------------"

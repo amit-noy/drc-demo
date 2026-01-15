@@ -37,6 +37,7 @@ jobs:
       - name: Bump package version
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
+          BRANCH: ${{ github.ref_name }}
         run: bash .github/scripts/bump-version.sh
 
       - name: Build package
