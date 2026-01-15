@@ -15,7 +15,6 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
-
     permissions:
       contents: write
 
@@ -38,7 +37,6 @@ jobs:
       - name: Bump package version
         run: |
           npm version ${{ github.event.inputs.version }} --no-git-tag-version
-          echo "NEW_VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
 
       - name: Build package
         run: npm run build
@@ -51,12 +49,11 @@ jobs:
           access: public
           tag: ${{ github.ref_name == 'development' && 'latest' || format('mlrun-{0}', github.ref_name) }}
 
-      - name: Commit version bump, create release tag & push
+      - name: "Create release: commit, tag & push"
         if: steps.publish.outcome == 'success'
         env:
-          NEW_VERSION: ${{ env.NEW_VERSION }}
           BRANCH: ${{ github.ref_name }}
-        run: bash .github/scripts/release-tag-and-commit.sh
+        run: bash .github/scripts/create-release.sh
 
       - name: Create GitHub Release
         if: steps.publish.outcome == 'success'

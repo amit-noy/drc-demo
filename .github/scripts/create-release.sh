@@ -2,16 +2,20 @@
 set -e
 
 # Required env:
-# NEW_VERSION
 # BRANCH
 
-if [ -z "$NEW_VERSION" ] || [ -z "$BRANCH" ]; then
-  echo "Missing required env vars: NEW_VERSION or BRANCH"
+if [ -z "$BRANCH" ]; then
+  echo "Missing required env var: BRANCH"
   exit 1
 fi
 
 # -----------------------
-# Generate release tag
+# 1️⃣ Read current version
+# -----------------------
+NEW_VERSION=$(node -p "require('./package.json').version")
+
+# -----------------------
+# 2️⃣ Generate release tag
 # -----------------------
 if [ "$BRANCH" = "development" ]; then
   RELEASE_TAG="v$NEW_VERSION"
@@ -24,7 +28,7 @@ echo "Generated release tag: $RELEASE_TAG"
 echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
 
 # -----------------------
-# Commit version bump
+# 3️⃣ Commit version bump
 # -----------------------
 git config user.name "github-actions[bot]"
 git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -36,12 +40,12 @@ git commit -m "chore(release): bump version to ${NEW_VERSION}" || {
 }
 
 # -----------------------
-# Tag commit
+# 4️⃣ Tag commit
 # -----------------------
 git tag "${RELEASE_TAG}"
 
 # -----------------------
-# Push commit + tag
+# 5️⃣ Push commit + tag
 # -----------------------
 git push origin "$BRANCH"
 git push origin "${RELEASE_TAG}"
