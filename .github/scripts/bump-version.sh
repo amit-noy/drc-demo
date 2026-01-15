@@ -80,7 +80,6 @@ echo "[7] package.json updated with version $FINAL_VERSION"
 # -----------------------
 # Export versions for workflow
 # -----------------------
-echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
 echo "FINAL_VERSION=$FINAL_VERSION" >> "$GITHUB_ENV"
 
 echo "[8] Version bump complete ✅"

@@ -13,7 +13,6 @@ set -e
 
 # Required env:
 # BRANCH
-# NEW_VERSION
 # FINAL_VERSION
 
 if [ -z "$BRANCH" ]; then
