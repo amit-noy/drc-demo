@@ -35,8 +35,9 @@ jobs:
         run: npm ci
 
       - name: Bump package version
-        run: |
-          npm version ${{ github.event.inputs.version }} --no-git-tag-version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: bash .github/scripts/bump-version.sh
 
       - name: Build package
         run: npm run build
