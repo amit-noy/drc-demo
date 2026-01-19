@@ -1,3 +1,17 @@
+# Copyright 2019 Iguazio
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 name: Publish & Release
 
 on:
@@ -11,6 +25,10 @@ on:
           - patch
           - minor
           - major
+      suffix:
+        description: Optional version suffix (e.g., beta, 1.10.x, feature-name)
+        required: false
+        type: string
 
 jobs:
   release:
@@ -35,10 +53,21 @@ jobs:
         run: npm ci
 
       - name: Bump package version
-        env:
-          INPUT_VERSION: ${{ github.event.inputs.version }}
-          BRANCH: ${{ github.ref_name }}
-        run: bash .github/scripts/bump-version.sh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "${{ github.event.inputs.suffix }}" ]; then
+            npm version ${{ github.event.inputs.version }} --no-git-tag-version
+            VERSION=$(node -p "require('./package.json').version")
+            npm version "${VERSION}-${{ github.event.inputs.suffix }}" --allow-same-version
+          else
+            npm version ${{ github.event.inputs.version }}
+          fi
+          git push
+          git push --tags
+
+      - name: Set release tag
+        run: echo "RELEASE_TAG=v$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
 
       - name: Build package
         run: npm run build
@@ -49,13 +78,7 @@ jobs:
         with:
           token: ${{ secrets.NPM_TOKEN }}
           access: public
-          tag: ${{ github.ref_name == 'development' && 'latest' || format('mlrun-{0}', github.ref_name) }}
-
-      - name: "Create release: commit, tag & push"
-        if: steps.publish.outcome == 'success'
-        env:
-          BRANCH: ${{ github.ref_name }}
-        run: bash .github/scripts/create-release.sh
+          tag: ${{ github.event.inputs.suffix == '' && 'latest' || github.event.inputs.suffix }}
 
       - name: Create GitHub Release
         if: steps.publish.outcome == 'success'
