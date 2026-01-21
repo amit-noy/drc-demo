@@ -34,18 +34,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Bump package version
+      - name: Bump Package version
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if [ "${{ github.ref_name }}" != "development" ]; then
-            npm version ${{ github.event.inputs.version }} --no-git-tag-version
-            VERSION=$(node -p "require('./package.json').version")
-            SUFFIX=$(echo "${{ github.ref_name }}" | tr '/' '-')
-            npm version "${VERSION}-${SUFFIX}" --allow-same-version
-          else
-            npm version ${{ github.event.inputs.version }}
-          fi
+          npm version ${{ github.event.inputs.version }}
           git push
           git push --tags
 
@@ -61,7 +54,6 @@ jobs:
         with:
           token: ${{ secrets.NPM_TOKEN }}
           access: public
-          tag: ${{ github.ref_name == 'development' && 'latest' || github.ref_name }}
 
       - name: Create GitHub Release
         if: steps.publish.outcome == 'success'
