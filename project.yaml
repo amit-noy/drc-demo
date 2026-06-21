@@ -1,0 +1,51 @@
+kind: Project
+metadata:
+  name: lead-qualifier
+  labels:
+    tier: "1"
+    domain: sales
+spec:
+  description: >
+    Lead qualification pipeline — ingest raw leads, enrich with company data,
+    score based on fit criteria, and route high-value leads to sales notification
+    while archiving low-value leads for future nurture campaigns.
+
+  params:
+    score_threshold: 50
+    notification_channel: slack
+
+  secrets:
+    - ENRICHMENT_API_KEY
+    - SLACK_WEBHOOK_URL
+
+  connections:
+    enrichment_api:
+      kind: api
+      description: Company enrichment service (e.g., Clearbit, Apollo)
+      url: https://api.example.com/v2/companies
+      auth:
+        type: bearer
+        token_env: ENRICHMENT_API_KEY
+    notification:
+      kind: api
+      description: Sales notification endpoint (Slack webhook)
+      url: https://hooks.slack.com/services/placeholder
+      auth:
+        type: bearer
+        token_env: SLACK_WEBHOOK_URL
+
+  runnables:
+    ingest_lead:
+      source: py://src.ingest.ingest_lead
+    enrichcompany:
+      source: py://src.enrich.EnrichCompany
+    score_lead:
+      source: py://src.score.score_lead
+    route_lead:
+      source: py://src.route.route_lead
+    notify_sales:
+      source: py://src.notify.notify_sales
+
+  workflows:
+    lead-pipeline:
+      source: py://src.pipeline.lead_pipeline
